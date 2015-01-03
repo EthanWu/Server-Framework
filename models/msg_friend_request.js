@@ -2,14 +2,12 @@
 
 module.exports = function(sequelize, DataTypes) {
   var MsgFriendRequest= sequelize.define("MsgFriendRequest", {
-    invitor: DataTypes.INTEGER,
-    invitee: DataTypes.INTEGER,
     verifyContent: DataTypes.STRING,
-    //accepted msg will be send to once nad removed from db, other msg will always be sent to user.
-    state: DataTypes.STRING
   }, {
     classMethods: {
       associate: function(models) {
+        MsgFriendRequest.belongsTo(models.User, {as:'fromUser',foreignKey: 'from_user_id'});
+        MsgFriendRequest.belongsTo(models.User, {as:'toUser',foreignKey: 'to_user_id'});
       }
     }
   });

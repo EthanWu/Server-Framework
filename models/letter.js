@@ -2,12 +2,12 @@
 
 module.exports = function(sequelize, DataTypes) {
   var Letter= sequelize.define("Letter", {
-    contact: DataTypes.INTEGER,
-    content: DataTypes.TEXT,
-    type: DataTypes.ENUM('in','out'),
+    content: DataTypes.TEXT
   }, {
     classMethods: {
       associate: function(models) {
+        Letter.belongsTo(models.User, {as:'fromUser',foreignKey: 'from_user_id'});
+        Letter.belongsTo(models.User, {as:'toUser',foreignKey: 'to_user_id'});
       }
     }
   });
