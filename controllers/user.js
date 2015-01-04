@@ -116,6 +116,9 @@ exports.getGroups = function (req, res, next) {
     }
     models.User.find(userId).then(function (user) {
         return user.getGroups().then(function(groups) {
+            for(var i=0;i<groups.length;i++){
+                delete groups[i].dataValues.GroupsUser;
+            }
             res.json(restapi.ok(restapi.SUCCESS,groups));
         });
     })

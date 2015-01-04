@@ -20,7 +20,9 @@ module.exports = function(sequelize, DataTypes) {
     classMethods: {
       associate: function(models) {
         User.hasMany(models.Group);
-        User.hasMany(models.User, {as:'Friends'});
+        User.hasMany(models.User, {as:'Friends',foreignKey: 'FriendId', through: 'friends'});
+        //BeFriends is used as combined primary key with Friends, So Sequelize will know it's many-to-many relationship, not one-to-many.
+        User.hasMany(models.User, {as:'BeFriends',foreignKey: 'FriendId2', through: 'friends'});
         User.hasMany(models.Letter, {as:'InLetters',foreignKey: 'in_user_has_id'});
         User.hasMany(models.Letter, {as:'OutLetters',foreignKey: 'out_user_has_id'});
         User.hasMany(models.MsgPrivate);

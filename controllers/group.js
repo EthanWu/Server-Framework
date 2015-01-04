@@ -3,8 +3,8 @@ var logger = require('../logger');
 var models  = require('../models');
 var restapi  = require('./restapi');
 var async = require('async');
-var text=require('../text')
-
+var text=require('../text');
+var utils=require('./utils');
 
 
 exports.getGroups = function (req, res, next) {
@@ -44,9 +44,16 @@ exports.addGroup = function (req, res, next) {
 
 exports.getGroup = function (req, res, next){
     var groupId = validator.trim(req.params.gid);
-    models.Group.find(groupId).then(function (group) {
-        res.json(restapi.ok(restapi.SUCCESS,group));
-    })
+    models.Group.find({
+        where:{id:groupId},
+        include: [{model: models.User}]})
+        .then(function (group) {
+            var users=group.Users;
+            for(var i=0;i<users.length;i++){
+                utils.convertSummaryInfo(users[i]);
+            }
+            res.json(restapi.ok(restapi.SUCCESS,group));
+        })
         .error(function () {
             res.json(restapi.error(restapi.FAILED, 'get group info failed'));
         });
@@ -86,7 +93,13 @@ exports.getGroupRequests = function (req, res, next) {
             res.json(restapi.error(restapi.UNAUTHORIZED, 'unauthorized request'));
             return ;
         }
-        return models.MsgGroupRequest.findAll({ where: { to_group_id:groupId} }).then(function (msgGroupRequests) {
+        return models.MsgGroupRequest.findAll({
+            where: { to_group_id:groupId},
+            include: [{model: models.User, as:'fromUser'},{model: models.Group, as:'toGroup'}]
+        }).then(function (msgGroupRequests) {
+            for(var i=0;i<msgGroupRequests.length;i++){
+                utils.convertSummaryInfo(msgGroupRequests[i].fromUser);
+            }
             res.json(restapi.ok(restapi.SUCCESS,msgGroupRequests));
         })
     })
@@ -242,11 +255,11 @@ exports.addGroupInvitation = function (req, res, next) {
         },
         function (group, invitee, cb) {
             var msgPrivate=models.MsgPrivate.build({
-                content: require('util').format(text.GROUP_INVITATION, group.name + (group.id), content),
+                content: require('util').format(text.GROUP_INVITATION, group.name + (group.id), content)
             })
             msgPrivate.save().then(function () {
                 msgPrivate.setUser(inviteeId);
-                res.json(restapi.ok(restapi.SUCCESS,msgPrivate));
+                res.json(restapi.ok(restapi.SUCCESS));
             }).fail(function (err) {
                 cb(restapi.error(restapi.FAILED, 'create invitation failed'));
             })
