@@ -6,6 +6,7 @@ var async = require('async');
 var Sequelize = require("sequelize");
 var bcrypt = require('bcryptjs');
 var text=require('../text')
+var utils=require('./utils');
 
 exports.signup = function (req, res, next) {
     var phone = validator.trim(req.body.phone);
@@ -64,7 +65,7 @@ exports.login = function (req, res, next) {
         }
         if(bcrypt.compareSync(password, user.password)){
             req.session.userId=user.id;
-            res.json(restapi.ok(restapi.SUCCESS,getFullInfo(user)));
+            res.json(restapi.ok(restapi.SUCCESS,utils.convertFullInfo(user)));
         }else{
             res.json(restapi.error(restapi.WRONG_PASSWD, 'wrong password'));
         }
@@ -84,9 +85,9 @@ exports.getInfo = function (req, res, next) {
         }
         if(userId==req.session.userId){
             req.session.userId=user.id;
-            res.json(restapi.ok(restapi.SUCCESS,getFullInfo(user)));
+            res.json(restapi.ok(restapi.SUCCESS,utils.convertFullInfo(user)));
         }else{
-            res.json(restapi.ok(restapi.SUCCESS,getSummaryInfo(user)));
+            res.json(restapi.ok(restapi.SUCCESS,utils.convertSummaryInfo(user)));
         }
     });
 }
@@ -100,7 +101,7 @@ exports.editInfo = function (req, res, next) {
     models.User.update( getAttributesFromRequest(req),{ where: { id : userId } })
         .success(function () {
             models.User.find(userId).then(function(user) {
-                res.json(restapi.ok(restapi.SUCCESS,getFullInfo(user)));
+                res.json(restapi.ok(restapi.SUCCESS,utils.convertFullInfo(user)));
             });
         })
         .error(function () {
@@ -213,7 +214,7 @@ exports.getFriends = function (req, res, next) {
         })
         .then(function(friends){
             for(i=0;i<friends.length;i++){
-                friends[i]=getSummaryInfo(friends[i]);
+                utils.convertSummaryInfo(friends[i]);
             }
             res.json(restapi.ok(restapi.SUCCESS,friends));
         })
@@ -239,7 +240,7 @@ exports.deleteFriend = function (req, res, next) {
             })
             .then(function(friends){
                 for(i=0;i<friends.length;i++){
-                    friends[i]=getSummaryInfo(friends[i]);
+                    utils.convertSummaryInfo(friends[i]);
                 }
                 res.json(restapi.ok(restapi.SUCCESS,friends));
             });
@@ -259,7 +260,7 @@ exports.getFriend = function (req, res, next) {
     models.User.find(userId).then(function (user) {
         return models.User.find(friendId).then(function (friend) {
             return user.hasFriend(friend.id).then(function() {
-                res.json(restapi.ok(restapi.SUCCESS,getFullInfo(friend)));
+                res.json(restapi.ok(restapi.SUCCESS,utils.convertFullInfo(friend)));
             });
         })
     })
@@ -280,13 +281,13 @@ exports.getFriendRequests = function (req, res, next) {
         include: [{ model: models.User, as: 'toUser' }]
     }).then(function (msgFriendRequests) {
         for(i=0;i<msgFriendRequests.length;i++){
-            msgFriendRequests[i].toUser=getSummaryInfo(msgFriendRequests[i].toUser);
+            utils.convertSummaryInfo(msgFriendRequests[i].toUser);
         }
         allMsgFriendRequests.out=msgFriendRequests;
         return models.MsgFriendRequest.findAll({ where: { to_user_id:userId}, include: [{ model: models.User, as: 'fromUser' }] })
     }).then(function (msgFriendRequests) {
         for(i=0;i<msgFriendRequests.length;i++){
-            msgFriendRequests[i].fromUser=getSummaryInfo(msgFriendRequests[i].fromUser);
+            utils.convertSummaryInfo(msgFriendRequests[i].fromUser);
         }
         allMsgFriendRequests.in=msgFriendRequests;
         res.json(restapi.ok(restapi.SUCCESS,allMsgFriendRequests));
@@ -439,8 +440,8 @@ exports.getLetters = function (req, res, next) {
             include: [{ model: models.User, as: 'fromUser' }, { model: models.User, as: 'toUser' }]
         }).then(function (letters) {
             for(i=0;i<letters.length;i++){
-                letters[i].fromUser=getSummaryInfo(letters[i].fromUser);
-                letters[i].toUser=getSummaryInfo(letters[i].toUser);
+                utils.convertSummaryInfo(letters[i].fromUser);
+                utils.convertSummaryInfo(letters[i].toUser);
             }
             res.json(restapi.ok(restapi.SUCCESS,letters));
         });
@@ -600,17 +601,6 @@ function getAttributesFromRequest(req){
     }
     return attr;
 }
-function getFullInfo(user) {
-    delete user.dataValues.password;
-    return user;
-}
-
-function getSummaryInfo(user) {
-    delete user.dataValues.phone;
-    delete user.dataValues.password;
-    return user;
-}
-
 
 function validTimestamp(timestamp){
     var now=Date.now()/1000;
