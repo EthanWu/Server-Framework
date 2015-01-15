@@ -19,6 +19,11 @@ exports.signup = function (req, res, next) {
         res.json(restapi.error(restapi.INVALID_PASSWD,'invalid password'));
         return;
     }
+    if (req.session.userId) {
+        res.status(422);
+        res.json(restapi.error(restapi.ALREADY_LOGGED_IN, 'already logged in'));
+        return;
+    }
     models.User.find({ where: { phone:phone} }).then(function(result) {
         if (result != null) {
             res.json(restapi.error(restapi.PHONE_REGISTERED, 'phone registered'));
@@ -56,6 +61,11 @@ exports.login = function (req, res, next) {
     if (!phone || !password) {
         res.status(422);
         res.json(restapi.error(restapi.INVALID_PHONE_PASSWD, 'invalid phone or password'));
+        return;
+    }
+    if (req.session.userId) {
+        res.status(422);
+        res.json(restapi.error(restapi.ALREADY_LOGGED_IN, 'already logged in'));
         return;
     }
     models.User.find({ where: { phone:phone} }).then(function(user) {
@@ -98,7 +108,12 @@ exports.editInfo = function (req, res, next) {
         res.json(restapi.error(restapi.INVALID_REQ,'invalid id'));
         return;
     }
-    models.User.update( getAttributesFromRequest(req),{ where: { id : userId } })
+    var params=getParamsFromRequest(req,res);
+    if(!params){
+        return;
+    }
+
+    models.User.update(params ,{ where: { id : userId } })
         .success(function () {
             models.User.find(userId).then(function(user) {
                 res.json(restapi.ok(restapi.SUCCESS,utils.convertFullInfo(user)));
@@ -570,36 +585,41 @@ exports.getMessages = function (req, res, next) {
     })
 }
 
-function getAttributesFromRequest(req){
-    attr={};
+function getParamsFromRequest(req,res){
+    params={};
     if(req.body.password){
-        attr.password=req.body.password;
+        var password = validator.trim(req.body.password);
+        if(!validPassword(password)){
+            res.json(restapi.error(restapi.INVALID_PASSWD,'invalid password'));
+            return null;
+        }
+        params.password=bcrypt.hashSync(password, 8);
     }
     if(req.body.nickname){
-        attr.nickname=req.body.nickname;
+        params.nickname=req.body.nickname;
     }
     if(req.body.sex){
-        attr.sex=req.body.sex;
+        params.sex=req.body.sex;
     }
     if(req.body.city){
-        attr.city=req.body.city;
+        params.city=req.body.city;
     }
     if(req.body.email){
-        attr.email=req.body.email;
+        params.email=req.body.email;
     }
     if(req.body.hobby){
-        attr.hobby=req.body.hobby;
+        params.hobby=req.body.hobby;
     }
     if(req.body.job){
-        attr.job=req.body.job;
+        params.job=req.body.job;
     }
     if(req.body.birthday){
-        attr.birthday=req.body.birthday;
+        params.birthday=req.body.birthday;
     }
     if(req.body.selfDesc){
-        attr.selfDesc=req.body.selfDesc;
+        params.selfDesc=req.body.selfDesc;
     }
-    return attr;
+    return params;
 }
 
 function validTimestamp(timestamp){
