@@ -5,7 +5,9 @@ var restapi = require('./restapi');
 var async = require('async');
 var Sequelize = require("sequelize");
 var bcrypt = require('bcryptjs');
-var text = require('../text')
+
+var text=require('../text')
+var utils=require('./utils');
 
 exports.signup = function (req, res, next) {
     var phone = validator.trim(req.body.phone);
@@ -18,7 +20,13 @@ exports.signup = function (req, res, next) {
         res.json(restapi.error(restapi.INVALID_PASSWD, 'invalid password'));
         return;
     }
-    models.User.find({ where: { phone: phone} }).then(function (result) {
+
+    if (req.session.userId) {
+        res.status(422);
+        res.json(restapi.error(restapi.ALREADY_LOGGED_IN, 'already logged in'));
+        return;
+    }
+    models.User.find({ where: { phone:phone} }).then(function(result) {
         if (result != null) {
             res.json(restapi.error(restapi.PHONE_REGISTERED, 'phone registered'));
             return;
@@ -57,15 +65,22 @@ exports.login = function (req, res, next) {
         res.json(restapi.error(restapi.INVALID_PHONE_PASSWD, 'invalid phone or password'));
         return;
     }
-    models.User.find({ where: { phone: phone} }).then(function (user) {
+
+    if (req.session.userId) {
+        res.status(422);
+        res.json(restapi.error(restapi.ALREADY_LOGGED_IN, 'already logged in'));
+        return;
+    }
+    models.User.find({ where: { phone:phone} }).then(function(user) {
         if (user == null) {
             res.json(restapi.error(restapi.NOT_REGISTERED, 'phone is not registered'));
             return;
         }
-        if (bcrypt.compareSync(password, user.password)) {
-            req.session.userId = user.id;
-            res.json(restapi.ok(restapi.SUCCESS, getFullInfo(user)));
-        } else {
+
+        if(bcrypt.compareSync(password, user.password)){
+            req.session.userId=user.id;
+            res.json(restapi.ok(restapi.SUCCESS,utils.convertFullInfo(user)));
+        }else{
             res.json(restapi.error(restapi.WRONG_PASSWD, 'wrong password'));
         }
     });
@@ -82,11 +97,12 @@ exports.getInfo = function (req, res, next) {
             res.json(restapi.error(restapi.USER_NO_FOUND, 'user no found'));
             return;
         }
-        if (userId == req.session.userId) {
-            req.session.userId = user.id;
-            res.json(restapi.ok(restapi.SUCCESS, getFullInfo(user)));
-        } else {
-            res.json(restapi.ok(restapi.SUCCESS, getSummaryInfo(user)));
+
+        if(userId==req.session.userId){
+            req.session.userId=user.id;
+            res.json(restapi.ok(restapi.SUCCESS,utils.convertFullInfo(user)));
+        }else{
+            res.json(restapi.ok(restapi.SUCCESS,utils.convertSummaryInfo(user)));
         }
     });
 }
@@ -97,10 +113,15 @@ exports.editInfo = function (req, res, next) {
         res.json(restapi.error(restapi.INVALID_REQ, 'invalid id'));
         return;
     }
-    models.User.update(getAttributesFromRequest(req), { where: { id: userId } })
+    var params=getParamsFromRequest(req,res);
+    if(!params){
+        return;
+    }
+
+    models.User.update(params ,{ where: { id : userId } })
         .success(function () {
-            models.User.find(userId).then(function (user) {
-                res.json(restapi.ok(restapi.SUCCESS, getFullInfo(user)));
+            models.User.find(userId).then(function(user) {
+                res.json(restapi.ok(restapi.SUCCESS,utils.convertFullInfo(user)));
             });
         })
         .error(function () {
@@ -213,9 +234,9 @@ exports.getFriends = function (req, res, next) {
         .then(function (user) {
             return user.getFriends();
         })
-        .then(function (friends) {
-            for (i = 0; i < friends.length; i++) {
-                friends[i] = getSummaryInfo(friends[i]);
+        .then(function(friends){
+            for(i=0;i<friends.length;i++){
+                utils.convertSummaryInfo(friends[i]);
             }
             res.json(restapi.ok(restapi.SUCCESS, friends));
         })
@@ -239,9 +260,9 @@ exports.deleteFriend = function (req, res, next) {
             .then(function () {
                 return user.getFriends();
             })
-            .then(function (friends) {
-                for (i = 0; i < friends.length; i++) {
-                    friends[i] = getSummaryInfo(friends[i]);
+            .then(function(friends){
+                for(i=0;i<friends.length;i++){
+                    utils.convertSummaryInfo(friends[i]);
                 }
                 res.json(restapi.ok(restapi.SUCCESS, friends));
             });
@@ -260,8 +281,8 @@ exports.getFriend = function (req, res, next) {
     }
     models.User.find(userId).then(function (user) {
         return models.User.find(friendId).then(function (friend) {
-            return user.hasFriend(friend.id).then(function () {
-                res.json(restapi.ok(restapi.SUCCESS, getFullInfo(friend)));
+            return user.hasFriend(friend.id).then(function() {
+                res.json(restapi.ok(restapi.SUCCESS,utils.convertFullInfo(friend)));
             });
         })
     })
@@ -283,16 +304,16 @@ exports.getFriendRequests = function (req, res, next) {
             { model: models.User, as: 'toUser' }
         ]
     }).then(function (msgFriendRequests) {
-        for (i = 0; i < msgFriendRequests.length; i++) {
-            msgFriendRequests[i].toUser = getSummaryInfo(msgFriendRequests[i].toUser);
+        for(i=0;i<msgFriendRequests.length;i++){
+            utils.convertSummaryInfo(msgFriendRequests[i].toUser);
         }
         allMsgFriendRequests.out = msgFriendRequests;
         return models.MsgFriendRequest.findAll({ where: { to_user_id: userId}, include: [
             { model: models.User, as: 'fromUser' }
         ] })
     }).then(function (msgFriendRequests) {
-        for (i = 0; i < msgFriendRequests.length; i++) {
-            msgFriendRequests[i].fromUser = getSummaryInfo(msgFriendRequests[i].fromUser);
+        for(i=0;i<msgFriendRequests.length;i++){
+            utils.convertSummaryInfo(msgFriendRequests[i].fromUser);
         }
         allMsgFriendRequests.in = msgFriendRequests;
         res.json(restapi.ok(restapi.SUCCESS, allMsgFriendRequests));
@@ -448,9 +469,9 @@ exports.getLetters = function (req, res, next) {
                 { model: models.User, as: 'toUser' }
             ]
         }).then(function (letters) {
-            for (i = 0; i < letters.length; i++) {
-                letters[i].fromUser = getSummaryInfo(letters[i].fromUser);
-                letters[i].toUser = getSummaryInfo(letters[i].toUser);
+            for(i=0;i<letters.length;i++){
+                utils.convertSummaryInfo(letters[i].fromUser);
+                utils.convertSummaryInfo(letters[i].toUser);
             }
             res.json(restapi.ok(restapi.SUCCESS, letters));
         });
@@ -579,51 +600,46 @@ exports.getMessages = function (req, res, next) {
     })
 }
 
-function getAttributesFromRequest(req) {
-    attr = {};
-    if (req.body.password) {
-        attr.password = req.body.password;
+function getParamsFromRequest(req,res){
+    params={};
+    if(req.body.password){
+        var password = validator.trim(req.body.password);
+        if(!validPassword(password)){
+            res.json(restapi.error(restapi.INVALID_PASSWD,'invalid password'));
+            return null;
+        }
+        params.password=bcrypt.hashSync(password, 8);
     }
-    if (req.body.nickname) {
-        attr.nickname = req.body.nickname;
+    if(req.body.nickname){
+        params.nickname=req.body.nickname;
     }
-    if (req.body.sex) {
-        attr.sex = req.body.sex;
+    if(req.body.sex){
+        params.sex=req.body.sex;
     }
-    if (req.body.city) {
-        attr.city = req.body.city;
+    if(req.body.city){
+        params.city=req.body.city;
     }
-    if (req.body.email) {
-        attr.email = req.body.email;
+    if(req.body.email){
+        params.email=req.body.email;
     }
-    if (req.body.hobby) {
-        attr.hobby = req.body.hobby;
+    if(req.body.hobby){
+        params.hobby=req.body.hobby;
     }
-    if (req.body.job) {
-        attr.job = req.body.job;
+    if(req.body.job){
+        params.job=req.body.job;
     }
-    if (req.body.birthday) {
-        attr.birthday = req.body.birthday;
+    if(req.body.birthday){
+        params.birthday=req.body.birthday;
     }
-    if (req.body.selfDesc) {
-        attr.selfDesc = req.body.selfDesc;
+    if(req.body.selfDesc){
+        params.selfDesc=req.body.selfDesc;
     }
-    return attr;
-}
-function getFullInfo(user) {
-    delete user.dataValues.password;
-    return user;
-}
-
-function getSummaryInfo(user) {
-    delete user.dataValues.phone;
-    delete user.dataValues.password;
-    return user;
+    return params;
 }
 
 
-function validTimestamp(timestamp) {
-    var now = Date.now() / 1000;
+function validTimestamp(timestamp){
+    var now=Date.now()/1000;
     var timestamp = parseInt(timestamp) || 0;
     //only accept request for last three month.
     if ((now - timestamp) <= 0 || (now - timestamp) > 3600 * 24 * 180) {
