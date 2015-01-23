@@ -1,9 +1,9 @@
 {
-  "name": "example-app",
+  "name": "jackfruit",
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www"
+    "start": "node server.js"
   },
   "dependencies": {
     "async": "^0.9.0",
