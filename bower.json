@@ -1,0 +1,22 @@
+{
+  "name": "jackfruit-server",
+  "version": "0.0.1",
+  "homepage": "https://github.com/EthanWu/Server-Framework",
+  "authors": [
+    "EthanWu <wlj0427@gmail.com>"
+  ],
+  "description": "the server side of jackfruit.",
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "bootstrap": "~3.3.2",
+    "angular-latest": "~1.3.10"
+  }
+}
