@@ -9,7 +9,7 @@ var bodyParser = require('body-parser');
 
 var app = express();
 
-app.set('port', process.env.PORT || 3000);
+app.set('port', process.env.PORT || 4000);
 app.use(morganLogger('dev'));
 
 // parse application/x-www-form-urlencoded
